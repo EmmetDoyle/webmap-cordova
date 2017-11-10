@@ -62,4 +62,4 @@ fabric.properties
 
 /platforms
 /plugins
-/www/downloads
+#/www/downloads
