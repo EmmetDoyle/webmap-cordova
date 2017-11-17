@@ -1,18 +1,29 @@
-var HOST = "http://<ask me for this>";
+var HOST = "**********";
 
 var URLS = {
     login: "/rest/tokenlogin/",
     userme: "/rest/userme/",
-    updateposition: "/rest/updateposition/"
+    updateposition: "/rest/updateposition/",
+    getamenities: "/rest/getamenities/"
 };
 
 var map;
+var posMarker;
+var geojsonLayer;
 
 var curIcon = L.ExtraMarkers.icon({
     icon: 'fa-crosshairs',
     iconColor: 'white',
     markerColor: 'blue',
     shape: 'square',
+    prefix: 'fa'
+});
+
+var amenityIcon = L.ExtraMarkers.icon({
+    icon: 'fa-info',
+    iconColor: 'white',
+    markerColor: 'orange',
+    shape: 'circle',
     prefix: 'fa'
 });
 
@@ -34,6 +45,7 @@ function onDeviceReady() {
         $("#in-password").val(localStorage.lastUserPwd);
     }
 
+    $("#amenity-search-button").on("touchstart", amenitySearch);
     $(document).on("pagecreate", "#map-page", function (event) {
         console.log("In pagecreate. Target is " + event.target.id + ".");
 
@@ -70,7 +82,7 @@ function onDeviceReady() {
     }
 
     watchID = navigator.geolocation.watchPosition(
-        function(pos) {
+        function (pos) {
 
         },
         function (err) {
@@ -79,7 +91,7 @@ function onDeviceReady() {
         {
             timeout: 30000
         }
-        );
+    );
 }
 
 function loginPressed() {
@@ -157,7 +169,13 @@ function setMapToCurrentLocation() {
     if (localStorage.lastKnownCurrentPosition) {
         var myPos = JSON.parse(localStorage.lastKnownCurrentPosition);
         var myLatLon = L.latLng(myPos.coords.latitude, myPos.coords.longitude);
-        L.marker(myLatLon, {icon: curIcon}).addTo(map);
+
+        if (map.hasLayer(posMarker)) {
+            posMarker.remove();
+        }
+
+        posMarker = L.marker(myLatLon, {icon: curIcon});
+        posMarker.addTo(map);
         map.flyTo(myLatLon, 15);
     }
 }
@@ -224,4 +242,51 @@ function setUserName() {
     }).fail(function (xhr, status, error) {
         $(".sp-username").html("");
     });
+}
+
+function amenitySearch() {
+    if (!$("#amenity-search-text").val()) {
+        showOkAlert("Empty search");
+        return
+    }
+    if (!map) {
+        showOkAlert("Cannot find map object");
+    }
+
+    var bboxString = map.getBounds().getSouth() + ", " + map.getBounds().getWest() + ", " + map.getBounds().getNorth() + ", " + map.getBounds().getEast();
+
+    $.ajax({
+        type: "GET",
+        headers: {"Authorization": localStorage.authtoken},
+        url: HOST + URLS["getamenities"],
+        data: {
+            amenity: $("#amenity-search-text").val(),
+            bbox: bboxString
+        }
+    }).done(function (data, status, xhr) {
+        if (map.hasLayer(geojsonLayer)) {
+            geojsonLayer.remove();
+        }
+        geojsonLayer = L.geoJSON(data, {
+            onEachFeature: popUp,
+            pointToLayer: function (feature, latlng) {
+                return L.marker(latlng, {icon: amenityIcon});
+            }
+        });
+        geojsonLayer.addTo(map);
+    }).fail(function (xhr, status, error) {
+        showOkAlert(error);
+    }).always(function () {
+        $.mobile.navigate("#map-page");
+    });
+}
+
+function popUp(feature, layer) {
+    var out = [];
+    if (feature.properties) {
+        for (key in feature.properties) {
+            out.push(key + ": " + feature.properties[key]);
+        }
+        layer.bindPopup(out.join("<br />"));
+    }
 }

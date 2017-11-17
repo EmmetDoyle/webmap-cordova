@@ -5,7 +5,7 @@
 
     <meta http-equiv="Content-Security-Policy"
           content="default-src 'self' data: gap: https://ssl.gstatic.com
-              http://<ask me for this>
+              http://***********
               https://*.tile.openstreetmap.org https://*.tile.osm.org
               http://*.tile.openstreetmap.org http://*.tile.osm.org
               'unsafe-eval';
@@ -82,8 +82,13 @@
                         <span class="fa fa-crosshairs fa-3x" style="color:deepskyblue"></span>
                     </a>
                 </td>
-                <td></td>
-                <td></td>
+                <td style="text-align: right">
+                    <input id="amenity-search-text" type="text" placeholder="Amenity Search">
+                </td>
+                <td style="width: 10%">
+                    <button id="amenity-search-button" type="button" class="ui-btn ui-corner-all ui-mini ui-btn-inline"
+                            style="color: white; background-color: forestgreen">Go</button>
+                </td>
             </tr>
         </table>
         <span id="leaflet-copyright" style="font-size: xx-small"></span>
