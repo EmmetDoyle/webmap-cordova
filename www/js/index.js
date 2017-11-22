@@ -1,4 +1,5 @@
-var HOST = "**********";
+var HOST = "http://xxx:8501";
+var GEOSERVER_HOST = "http://xxx:82/geoserver/";
 
 var URLS = {
     login: "/rest/tokenlogin/",
@@ -10,6 +11,7 @@ var URLS = {
 var map;
 var posMarker;
 var geojsonLayer;
+var boundariesLayer;
 
 var curIcon = L.ExtraMarkers.icon({
     icon: 'fa-crosshairs',
@@ -220,6 +222,10 @@ function makeBasicMap() {
         useCache: true
     }).addTo(map);
 
+    map.on("moveend", function () {
+        boundarySearch("cso:edgeom");
+    });
+
     $("#leaflet-copyright").html("Leaflet | Map Tiles &copy; <a href='http://openstreetmap.org'>OpenStreetMap</a> contributors");
 }
 
@@ -289,4 +295,52 @@ function popUp(feature, layer) {
         }
         layer.bindPopup(out.join("<br />"));
     }
+}
+
+function boundarySearch(dataset) {
+    /*
+    * http://mf1.dit.ie:81/geoserver/cso/ows?
+    * service=WFS&version=1.1.0
+    * &request=GetFeature
+    * &bbox=51.0,-9.0,53.5,-7.0,urn:ogc:def:crs:EPSG:4326
+    * &typeName=cso:gageom
+    * &outputFormat=application%2Fjson
+    *
+    * */
+
+    if (!map) {
+        showOkAlert("Cannot find map object");
+    }
+
+    var bboxString = map.getBounds().getSouth() + ", " + map.getBounds().getWest() + ", " + map.getBounds().getNorth() + ", " + map.getBounds().getEast();
+    var urlString = GEOSERVER_HOST +
+        "ows?service=WFS&version=1.1.0&request=GetFeature&bbox=" +
+        bboxString + ",urn:ogc:def:crs:EPSG:4326&typeName=" +
+        dataset +
+        "&srsName=EPSG:4326&outputFormat=application%2Fjson";
+
+    $.ajax({
+        type: "GET",
+        headers: {"Authorization": localStorage.authtoken},
+        url: urlString
+    }).done(function (data, status, xhr) {
+        if (map.hasLayer(boundariesLayer)) {
+            boundariesLayer.remove();
+        }
+        boundariesLayer = L.geoJSON(data, {
+            style: function (feature) {
+                return {
+                    fill: false,
+                    weight: 2,
+                    opacity: 0.5,
+                    color: 'blue'
+                };
+            }
+        });
+        boundariesLayer.addTo(map);
+    }).fail(function (xhr, status, error) {
+        showOkAlert(error);
+    }).always(function () {
+        $.mobile.navigate("#map-page");
+    });
 }
