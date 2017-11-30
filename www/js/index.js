@@ -1,5 +1,5 @@
 var HOST = "http://xxx:8501";
-var GEOSERVER_HOST = "http://xxx:82/geoserver/";
+var GEOSERVER_HOST = "xxx:82/geoserver/";
 
 var URLS = {
     login: "/rest/tokenlogin/",
@@ -12,6 +12,7 @@ var map;
 var posMarker;
 var geojsonLayer;
 var boundariesLayer;
+var routingControl;
 
 var curIcon = L.ExtraMarkers.icon({
     icon: 'fa-crosshairs',
@@ -85,15 +86,20 @@ function onDeviceReady() {
 
     watchID = navigator.geolocation.watchPosition(
         function (pos) {
-
+            console.log("Watch ID: " + watchID + ": Got position -> " + JSON.stringify(pos));
         },
         function (err) {
-            console.log("Watched location error: " + err.message);
+            console.log("Watch ID: " + watchID + ": Location error: " + JSON.stringify(err));
         },
         {
-            timeout: 30000
+            timeout: 10000
         }
     );
+}
+
+function stopWatch() {
+    console.log("Cleared Watch ID " + watchID);
+    navigator.geolocation.clearWatch(watchID);
 }
 
 function loginPressed() {
@@ -212,6 +218,15 @@ function updatePosition() {
     }
 }
 
+function createButton(label, container) {
+    var btn = L.DomUtil.create('button', '', container);
+    btn.setAttribute('type', 'button');
+    btn.setAttribute('class', 'ui-btn ui-corner-all ui-mini ui-btn-inline');
+    btn.setAttribute('style', 'color: white; background-color: forestgreen');
+    btn.innerHTML = "<span class='fa fa-map-marker fa-lg' style='color:white'></span> " + label;
+    return btn;
+}
+
 function makeBasicMap() {
     console.log("In makeBasicMap.");
     map = L.map("map-var", {
@@ -222,8 +237,35 @@ function makeBasicMap() {
         useCache: true
     }).addTo(map);
 
+    routingContol = L.Routing.control({
+        waypoints: [],
+        routeWhileDragging: true
+    });
+    routingContol.addTo(map);
+
     map.on("moveend", function () {
         boundarySearch("cso:edgeom");
+    });
+
+    map.on("click", function (evt) {
+        if (localStorage.lastKnownCurrentPosition) {
+            var myPos = JSON.parse(localStorage.lastKnownCurrentPosition);
+            var myStartPoint = L.latLng(myPos.coords.latitude, myPos.coords.longitude);
+        }
+
+        var container = L.DomUtil.create('div'),
+            destBtn = createButton('Directions to Here', container);
+
+        L.popup()
+            .setContent(container)
+            .setLatLng(evt.latlng)
+            .openOn(map);
+
+        L.DomEvent.on(destBtn, 'click', function () {
+            routingContol.setWaypoints([myStartPoint, evt.latlng]);
+            map.closePopup();
+        });
+
     });
 
     $("#leaflet-copyright").html("Leaflet | Map Tiles &copy; <a href='http://openstreetmap.org'>OpenStreetMap</a> contributors");
