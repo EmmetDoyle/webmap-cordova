@@ -1,18 +1,11 @@
-var HOST = "http://xxx:8501";
-var GEOSERVER_HOST = "xxx:82/geoserver/";
+var HOST = "http://178.62.74.44:80";
 
 var URLS = {
-    login: "/rest/tokenlogin/",
-    userme: "/rest/userme/",
-    updateposition: "/rest/updateposition/",
-    getamenities: "/rest/getamenities/"
+    getParties: "/parties/"
 };
 
 var map;
 var posMarker;
-var geojsonLayer;
-var boundariesLayer;
-var routingControl;
 
 var curIcon = L.ExtraMarkers.icon({
     icon: 'fa-crosshairs',
@@ -22,67 +15,14 @@ var curIcon = L.ExtraMarkers.icon({
     prefix: 'fa'
 });
 
-var amenityIcon = L.ExtraMarkers.icon({
-    icon: 'fa-info',
-    iconColor: 'white',
-    markerColor: 'orange',
-    shape: 'circle',
-    prefix: 'fa'
-});
-
-var locationWatchId;
-
 function onLoad() {
     console.log("In onLoad.");
     document.addEventListener('deviceready', onDeviceReady, false);
 }
 
 function onDeviceReady() {
-    console.log("In onDeviceReady.");
-
-    $("#btn-login").on("touchstart", loginPressed);
-    $("#sp-logout").on("touchstart", logoutPressed);
-
-    if (localStorage.lastUserName && localStorage.lastUserPwd) {
-        $("#in-username").val(localStorage.lastUserName);
-        $("#in-password").val(localStorage.lastUserPwd);
-    }
-
-    $("#amenity-search-button").on("touchstart", amenitySearch);
-    $(document).on("pagecreate", "#map-page", function (event) {
-        console.log("In pagecreate. Target is " + event.target.id + ".");
-
-        $("#goto-currentlocation").on("touchstart", function () {
-            getCurrentlocation();
-        });
-
-        $("#map-page").enhanceWithin();
-
-        makeBasicMap();
-        getCurrentlocation();
-    });
-
-    $(document).on("pageshow", function (event) {
-        console.log("In pageshow. Target is " + event.target.id + ".");
-        if (!localStorage.authtoken) {
-            $.mobile.navigate("#login-page");
-        }
-        setUserName();
-    });
-
-    $(document).on("pageshow", "#map-page", function () {
-        console.log("In pageshow / #map-page.");
-        map.invalidateSize();
-    });
-
-    $('div[data-role="page"]').page();
-
-    console.log("TOKEN: " + localStorage.authtoken);
-    if (localStorage.authtoken) {
-        $.mobile.navigate("#map-page");
-    } else {
-        $.mobile.navigate("#login-page");
-    }
+    makeBasicMap();
+    getCurrentlocation();
 
     watchID = navigator.geolocation.watchPosition(
         function (pos) {
@@ -95,51 +35,6 @@ function onDeviceReady() {
             timeout: 10000
         }
     );
-}
-
-function stopWatch() {
-    console.log("Cleared Watch ID " + watchID);
-    navigator.geolocation.clearWatch(watchID);
-}
-
-function loginPressed() {
-    console.log("In loginPressed.");
-    $.ajax({
-        type: "GET",
-        url: HOST + URLS["login"],
-        data: {
-            username: $("#in-username").val(),
-            password: $("#in-password").val()
-        }
-    }).done(function (data, status, xhr) {
-        localStorage.authtoken = localStorage.authtoken = "Token " + xhr.responseJSON.token;
-        localStorage.lastUserName = $("#in-username").val();
-        localStorage.lastUserPwd = $("#in-password").val();
-
-        $.mobile.navigate("#map-page");
-    }).fail(function (xhr, status, error) {
-        var message = "Login Failed\n";
-        if ((!xhr.status) && (!navigator.onLine)) {
-            message += "Bad Internet Connection\n";
-        }
-        message += "Status: " + xhr.status + " " + xhr.responseText;
-        showOkAlert(message);
-        logoutPressed();
-    });
-}
-
-function logoutPressed() {
-    console.log("In logoutPressed.");
-    localStorage.removeItem("authtoken");
-    $.mobile.navigate("#login-page");
-    // $.ajax({
-    //     type: "GET",
-    //     headers: {"Authorization": localStorage.authtoken}
-    //     // url: HOST + URLS["logout"]
-    // }).always(function () {
-    //     localStorage.removeItem("authtoken");
-    //     $.mobile.navigate("#login-page");
-    // });
 }
 
 function showOkAlert(message) {
@@ -218,15 +113,6 @@ function updatePosition() {
     }
 }
 
-function createButton(label, container) {
-    var btn = L.DomUtil.create('button', '', container);
-    btn.setAttribute('type', 'button');
-    btn.setAttribute('class', 'ui-btn ui-corner-all ui-mini ui-btn-inline');
-    btn.setAttribute('style', 'color: white; background-color: forestgreen');
-    btn.innerHTML = "<span class='fa fa-map-marker fa-lg' style='color:white'></span> " + label;
-    return btn;
-}
-
 function makeBasicMap() {
     console.log("In makeBasicMap.");
     map = L.map("map-var", {
@@ -236,16 +122,6 @@ function makeBasicMap() {
     L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         useCache: true
     }).addTo(map);
-
-    routingContol = L.Routing.control({
-        waypoints: [],
-        routeWhileDragging: true
-    });
-    routingContol.addTo(map);
-
-    map.on("moveend", function () {
-        boundarySearch("cso:edgeom");
-    });
 
     map.on("click", function (evt) {
         if (localStorage.lastKnownCurrentPosition) {
@@ -277,112 +153,4 @@ function myGeoPosition(p) {
     this.coords.longitude = p.coords.longitude;
     this.coords.accuracy = (p.coords.accuracy) ? p.coords.accuracy : 0;
     this.timestamp = (p.timestamp) ? p.timestamp : new Date().getTime();
-}
-
-function setUserName() {
-    console.log("In setUserName.");
-    $.ajax({
-        type: "GET",
-        headers: {"Authorization": localStorage.authtoken},
-        url: HOST + URLS["userme"]
-    }).done(function (data, status, xhr) {
-        $(".sp-username").html(xhr.responseJSON.properties.username);
-    }).fail(function (xhr, status, error) {
-        $(".sp-username").html("");
-    });
-}
-
-function amenitySearch() {
-    if (!$("#amenity-search-text").val()) {
-        showOkAlert("Empty search");
-        return
-    }
-    if (!map) {
-        showOkAlert("Cannot find map object");
-    }
-
-    var bboxString = map.getBounds().getSouth() + ", " + map.getBounds().getWest() + ", " + map.getBounds().getNorth() + ", " + map.getBounds().getEast();
-
-    $.ajax({
-        type: "GET",
-        headers: {"Authorization": localStorage.authtoken},
-        url: HOST + URLS["getamenities"],
-        data: {
-            amenity: $("#amenity-search-text").val(),
-            bbox: bboxString
-        }
-    }).done(function (data, status, xhr) {
-        if (map.hasLayer(geojsonLayer)) {
-            geojsonLayer.remove();
-        }
-        geojsonLayer = L.geoJSON(data, {
-            onEachFeature: popUp,
-            pointToLayer: function (feature, latlng) {
-                return L.marker(latlng, {icon: amenityIcon});
-            }
-        });
-        geojsonLayer.addTo(map);
-    }).fail(function (xhr, status, error) {
-        showOkAlert(error);
-    }).always(function () {
-        $.mobile.navigate("#map-page");
-    });
-}
-
-function popUp(feature, layer) {
-    var out = [];
-    if (feature.properties) {
-        for (key in feature.properties) {
-            out.push(key + ": " + feature.properties[key]);
-        }
-        layer.bindPopup(out.join("<br />"));
-    }
-}
-
-function boundarySearch(dataset) {
-    /*
-    * http://mf1.dit.ie:81/geoserver/cso/ows?
-    * service=WFS&version=1.1.0
-    * &request=GetFeature
-    * &bbox=51.0,-9.0,53.5,-7.0,urn:ogc:def:crs:EPSG:4326
-    * &typeName=cso:gageom
-    * &outputFormat=application%2Fjson
-    *
-    * */
-
-    if (!map) {
-        showOkAlert("Cannot find map object");
-    }
-
-    var bboxString = map.getBounds().getSouth() + ", " + map.getBounds().getWest() + ", " + map.getBounds().getNorth() + ", " + map.getBounds().getEast();
-    var urlString = GEOSERVER_HOST +
-        "ows?service=WFS&version=1.1.0&request=GetFeature&bbox=" +
-        bboxString + ",urn:ogc:def:crs:EPSG:4326&typeName=" +
-        dataset +
-        "&srsName=EPSG:4326&outputFormat=application%2Fjson";
-
-    $.ajax({
-        type: "GET",
-        headers: {"Authorization": localStorage.authtoken},
-        url: urlString
-    }).done(function (data, status, xhr) {
-        if (map.hasLayer(boundariesLayer)) {
-            boundariesLayer.remove();
-        }
-        boundariesLayer = L.geoJSON(data, {
-            style: function (feature) {
-                return {
-                    fill: false,
-                    weight: 2,
-                    opacity: 0.5,
-                    color: 'blue'
-                };
-            }
-        });
-        boundariesLayer.addTo(map);
-    }).fail(function (xhr, status, error) {
-        showOkAlert(error);
-    }).always(function () {
-        $.mobile.navigate("#map-page");
-    });
 }
