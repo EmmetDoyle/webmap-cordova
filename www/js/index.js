@@ -15,6 +15,14 @@ var curIcon = L.ExtraMarkers.icon({
     prefix: 'fa'
 });
 
+var partyIcon = L.ExtraMarkers.icon({
+    icon: 'fa-music',
+    iconColor: 'white',
+    markerColor: 'green',
+    shape: 'circle',
+    prefix: 'fa'
+});
+
 function onLoad() {
     console.log("In onLoad.");
     document.addEventListener('deviceready', onDeviceReady, false);
@@ -46,15 +54,17 @@ function getCurrentlocation() {
     var myLatLon;
     var myPos;
 
+
+
     navigator.geolocation.getCurrentPosition(
         function (pos) {
             console.log("Got location")
             // myLatLon = L.latLng(pos.coords.latitude, pos.coords.longitude);
             myPos = new myGeoPosition(pos);
-            localStorage.lastKnownCurrentPosition = JSON.stringify(myPos);
+            console.log(myPos);
 
+            sendPositionToApi(myPos);
             setMapToCurrentLocation();
-            updatePosition();
         },
         function (err) {
             console.log("Location error: " + err.message);
@@ -65,6 +75,32 @@ function getCurrentlocation() {
             timeout: 30000
         }
     );
+}
+
+function sendPositionToApi(pos) {
+    $.ajax({
+        type: "GET",
+        url: HOST + URLS["getParties"],
+        data: {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+        },
+        success: function(result) {
+            console.log(result);
+            addPartiesToMap(result);
+        }
+    });
+}
+
+function addPartiesToMap(parties) {
+    for(var i = 0; i < parties.length; i++){
+        var party = parties[i];
+        var pos = L.latLng(party.location.coordinates[1],party.location.coordinates[0]);
+
+        posMarker = L.marker(pos,{icon: partyIcon});
+        posMarker.addTo(map);
+
+    }
 }
 
 function setMapToCurrentLocation() {
@@ -80,36 +116,6 @@ function setMapToCurrentLocation() {
         posMarker = L.marker(myLatLon, {icon: curIcon});
         posMarker.addTo(map);
         map.flyTo(myLatLon, 15);
-    }
-}
-
-function updatePosition() {
-    console.log("In updatePosition.");
-    if (localStorage.lastKnownCurrentPosition) {
-        var myPos = JSON.parse(localStorage.lastKnownCurrentPosition);
-        $.ajax({
-            type: "PATCH",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Authorization": localStorage.authtoken
-            },
-            url: HOST + URLS["updateposition"],
-            data: {
-                lat: myPos.coords.latitude,
-                lon: myPos.coords.longitude
-            }
-        }).done(function (data, status, xhr) {
-            showOkAlert("Position Updated");
-        }).fail(function (xhr, status, error) {
-            var message = "Position Update Failed\n";
-            if ((!xhr.status) && (!navigator.onLine)) {
-                message += "Bad Internet Connection\n";
-            }
-            message += "Status: " + xhr.status + " " + xhr.responseText;
-            showOkAlert(message);
-        }).always(function () {
-            $.mobile.navigate("#map-page");
-        });
     }
 }
 
