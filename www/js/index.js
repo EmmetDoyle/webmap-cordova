@@ -99,6 +99,7 @@ function addPartiesToMap(parties) {
 
         posMarker = L.marker(pos,{icon: partyIcon});
         posMarker.addTo(map);
+        posMarker.bindPopup("<b>" + party.name + "</b><br> Genre: " + party.genre.name)
 
     }
 }
